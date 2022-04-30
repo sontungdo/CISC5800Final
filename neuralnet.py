@@ -66,6 +66,9 @@ class Layer:
 		Activate neurons using the sigmoid function
 		"""
 		self.outputs = 1/(1 + np.exp(-self.outputs))
+	
+	def ReLu(self):
+		self.output = np.maximum(0, self.outputs)
 
 	def softmax(self):
 		"""
