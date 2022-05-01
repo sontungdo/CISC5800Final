@@ -2,7 +2,13 @@ import numpy as np
 
 from random import seed
 from random import random
- 
+
+def cost_function(y_pred, y_true):
+	"""
+	Calculate the cost (sum of squared erros) from a data point. Data is a 1D array of expected output (matches shape of model outputs)
+	"""
+	return np.sum(np.square(y_true - y_pred))
+
 class Network:
 	def __init__(self):
 		"""
@@ -11,6 +17,12 @@ class Network:
 		self.net = list()
 		self.n_layers = 0
 
+	def get_output(self):
+		"""
+		Get output layer of the network
+		"""
+		return self.net[self.n_layers-1].outputs
+
 	def add_layer(self, input_size, n):
 		"""
 		Add a layer of n units to the network that can take input_size inputs
@@ -18,6 +30,20 @@ class Network:
 		layer = Layer(n_inputs=input_size, n_units=n)
 		self.net.append(layer)
 		self.n_layers += 1
+
+	def construct_network(self, n_inputs, config):
+		"""
+		Construct a network from a 1D array config that can take in n_inputs.
+			config: configuration of network (1D array that tells the number of neurons in each layer)
+		"""
+		# loop through the array and add layer 1 by 1
+		for i in range(len(config)):
+			# first layer takes in n_inputs inputs
+			if i == 0:
+				self.add_layer(n_inputs, config[0])
+			# other layers takes in number of inputs equal to number of units in the previous layer
+			else:
+				self.add_layer(config[i-1], config[i])
 
 	def forward_propagate(self, inputs):
 		"""
@@ -36,7 +62,66 @@ class Network:
 				self.net[i].sigmoid()
 			else:
 				self.net[i].softmax()
+
+	def error_signal(self, y_true):
+		"""
+		Calculate the error signal of all layers (after a forward pass).
+		Return list of errors in each layer. Each layer's error is a 1D np array.
+		AGGREGATE ERROR SIGNAL IN A BATCH USING AVERAGE OF ALL ERRORS
+
+		"""
+		# initialize empty array to contain error signal vectors
+		zero = np.zeros(1)
+		error = [zero] * self.n_layers
+		# Calculate error signal of top layer
+		top_layer = self.net[-1]
+		error_top = (1 - top_layer.outputs) * top_layer.outputs * (y_true - top_layer.outputs)
+		error[self.n_layers-1] = error_top
+		# Calculate error signal of all non-top layer
+		for i in reversed(range(self.n_layers-1)):
+			layer_error = np.zeros(self.net[i].n_units)
+			# loop through each neuron in the layer
+			for j in range(self.net[i].n_units): # neuron index j, layer i
+				error_correction = np.dot(self.net[i].weights[:-1,j], error[i+1])
+				layer_error[j] = (1 - self.net[i].outputs[j]) * self.net[i].outputs[j] * error_correction
+			error[i] = layer_error
+		return error
+
+	def update_weights(self, error, data, learning_rate=0.1):
+		"""
+		Update weights according to the error signals. Use learning rate 
+			to control how fast the network learns
+		"""
+		# update each layer
+		for i in reversed(range(self.n_layers)):
+			# input is input data for first layer, previous output for other layers
+			if i == 0:
+				input = data
+			else:
+				input = self.net[i-1].outputs
+			# add 1 to the end of input to update bias
+			input = np.append(input, [1])
+			# update each neuron index j in layer i
+			for j in range(self.net[i].n_units):
+				self.net[i].weights[j] += input * error[i][j] * learning_rate
 			
+	def train(self, train, n_epoch, n_class, learning_rate=0.1, batch_size=1):
+		"""
+		Train the network
+		"""
+		for epoch in range(n_epoch):
+			total_error = 0
+			# NEED TO AGGREGATE THE ERRORS BEFORE UPDATE
+			for row in train:
+				self.forward_propagate(row[:-1])
+				output = self.get_output()
+				expected = [0 for i in range(n_class)]
+				expected[row[-1]] = 1
+				total_error += cost_function(output, expected)
+				error = self.error_signal(expected)
+				self.update_weights(error, row[:-1], learning_rate)
+			print('>epoch=%d, lrate=%.3f, error=%.3f' % (epoch, learning_rate, total_error))
+
 
 
 class Layer:
@@ -46,29 +131,29 @@ class Layer:
 			n_inputs columns. biases is a 1D array of n_units
 		outputs is the vector containing outputs of all n_units neurons
 		"""
-		self.weights = np.random.rand(n_units, n_inputs)
-		self.biases = np.random.rand(n_units)
+		self.weights = np.random.rand(n_units, n_inputs+1)
+		#self.biases = np.random.rand(n_units)
 		self.outputs = np.zeros(n_units)
 		self.n_units = n_units # number of units
 
 	def calculate_output(self, inputs):
 		"""
 		Calculate neuron activation using dot product of weights and inputs
-		inputs is a vector with 1 less element then weights. Last element of weight vector is the bias.
+		inputs is a vector with 1 less element then weights + an element 1 at the end. Last element of weight vector is the bias.
 		"""
+		if (len(inputs) == len(self.weights[0]) - 1):
+			inputs = np.append(inputs, [1])
 		# loop through each neuron
 		for i in range(self.n_units):
 			# calculate dot product of weights and inputs, plus the bias
-			self.outputs[i] = np.dot(self.weights[i], inputs) + self.biases[i]
+			self.outputs[i] = np.dot(self.weights[i], inputs)
+			#self.outputs[i] = np.dot(self.weights[i,:-1], inputs) + self.weights[i,-1]
 	
 	def sigmoid(self):
 		"""
 		Activate neurons using the sigmoid function
 		"""
 		self.outputs = 1/(1 + np.exp(-self.outputs))
-	
-	def ReLu(self):
-		self.output = np.maximum(0, self.outputs)
 
 	def softmax(self):
 		"""
@@ -78,16 +163,24 @@ class Layer:
 		sum = np.sum(self.outputs)
 		self.outputs = self.outputs/sum
 
- 
-layer1 = Layer(4, 3) # 4 inputs, 3 neurons
-print(layer1.weights)
-print(layer1.outputs)
+dataset = [[2.7810836,2.550537003,0],
+	[1.465489372,2.362125076,0],
+	[3.396561688,4.400293529,0],
+	[1.38807019,1.850220317,0],
+	[3.06407232,3.005305973,0],
+	[7.627531214,2.759262235,1],
+	[5.332441248,2.088626775,1],
+	[6.922596716,1.77106367,1],
+	[8.675418651,-0.242068655,1],
+	[7.673756466,3.508563011,1]]
 
-input = np.array([1,2,3,-4])
-layer1.calculate_output(input)
-print(layer1.outputs)
+n_inputs = len(dataset[0]) - 1
+n_outputs = len(set([row[-1] for row in dataset]))
 
-layer1.sigmoid()
-print(layer1.outputs)
+neural_net = Network()
+neural_net.construct_network(n_inputs, [3, n_outputs])
+neural_net.train(dataset, 100, n_class=n_outputs, learning_rate=0.2)
+
+
 
 
