@@ -1,7 +1,5 @@
 import numpy as np
 
-from random import seed
-from random import random
 
 def cost_function(y_pred, y_true):
 	"""
@@ -65,10 +63,8 @@ class Network:
 
 	def error_signal(self, y_true):
 		"""
-		Calculate the error signal of all layers (after a forward pass).
+		Calculate the error signal of all layers (after a forward pass). Use sum of squared errors.
 		Return list of errors in each layer. Each layer's error is a 1D np array.
-		AGGREGATE ERROR SIGNAL IN A BATCH USING AVERAGE OF ALL ERRORS
-
 		"""
 		# initialize empty array to contain error signal vectors
 		zero = np.zeros(1)
@@ -105,22 +101,39 @@ class Network:
 			for j in range(self.net[i].n_units):
 				self.net[i].weights[j] += input * error[i][j] * learning_rate
 			
-	def train(self, train, n_epoch, n_class, learning_rate=0.1, batch_size=1):
+	def train(self, data, n_epoch, n_class, learning_rate=0.1, batch_size=1):
 		"""
-		Train the network
+		Train the network using the data. 
+			data: 2D array of data points, with columns as features and last column as the class
+			n_epoch: number of epochs to train
+			n_class: number of classes for the classification task
+			learning_rate: rate of learning for weight updates
+			batch_size: batch size for the training process
 		"""
 		for epoch in range(n_epoch):
-			total_error = 0
+			loss = 0
+			# temporary storage for each batch
+			batch_error = 0
+			batch_data = list()
 			# NEED TO AGGREGATE THE ERRORS BEFORE UPDATE
-			for row in train:
+			for idx, row in enumerate(data):
 				self.forward_propagate(row[:-1])
-				output = self.get_output()
-				expected = [0 for i in range(n_class)]
-				expected[row[-1]] = 1
-				total_error += cost_function(output, expected)
-				error = self.error_signal(expected)
-				self.update_weights(error, row[:-1], learning_rate)
-			print('>epoch=%d, lrate=%.3f, error=%.3f' % (epoch, learning_rate, total_error))
+				Y_pred = self.get_output()
+				Y_train = [0 for i in range(n_class)]
+				Y_train[row[-1]] = 1
+				loss += cost_function(Y_pred, Y_train) # calculate value of loss function
+				batch_error += self.error_signal(Y_train) # accumulate the error for this batch
+				batch_data.append(row) # save the data of the batch
+				# update weight after each batch
+				if (idx+1) % batch_size == 0 or idx == len(data)-1:
+					batch_error /= batch_size # average of errors
+					# update weights
+					for r in batch_data:
+						self.update_weights(batch_error, r[:-1], learning_rate)
+					# clear storage for nexxt batch
+					batch_error = 0
+					batch_data.clear()
+			print('>epoch=%d, lrate=%.3f, error=%.3f' % (epoch, learning_rate, loss))
 
 
 
@@ -162,24 +175,6 @@ class Layer:
 		self.outputs = np.exp(self.outputs)
 		sum = np.sum(self.outputs)
 		self.outputs = self.outputs/sum
-
-dataset = [[2.7810836,2.550537003,0],
-	[1.465489372,2.362125076,0],
-	[3.396561688,4.400293529,0],
-	[1.38807019,1.850220317,0],
-	[3.06407232,3.005305973,0],
-	[7.627531214,2.759262235,1],
-	[5.332441248,2.088626775,1],
-	[6.922596716,1.77106367,1],
-	[8.675418651,-0.242068655,1],
-	[7.673756466,3.508563011,1]]
-
-n_inputs = len(dataset[0]) - 1
-n_outputs = len(set([row[-1] for row in dataset]))
-
-neural_net = Network()
-neural_net.construct_network(n_inputs, [3, n_outputs])
-neural_net.train(dataset, 100, n_class=n_outputs, learning_rate=0.2)
 
 
 
