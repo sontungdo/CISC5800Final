@@ -78,7 +78,7 @@ class Network:
 			layer_error = np.zeros(self.net[i].n_units)
 			# loop through each neuron in the layer
 			for j in range(self.net[i].n_units): # neuron index j, layer i
-				error_correction = np.dot(self.net[i].weights[:-1,j], error[i+1])
+				error_correction = np.dot(self.net[i+1].weights[:,j], error[i+1])
 				layer_error[j] = (1 - self.net[i].outputs[j]) * self.net[i].outputs[j] * error_correction
 			error[i] = layer_error
 		return error
@@ -113,27 +113,48 @@ class Network:
 		for epoch in range(n_epoch):
 			loss = 0
 			# temporary storage for each batch
-			batch_error = 0
+			batch_error = list()
 			batch_data = list()
-			# NEED TO AGGREGATE THE ERRORS BEFORE UPDATE
 			for idx, row in enumerate(data):
+				# forward pass
 				self.forward_propagate(row[:-1])
 				Y_pred = self.get_output()
+
 				Y_train = [0 for i in range(n_class)]
 				Y_train[row[-1]] = 1
 				loss += cost_function(Y_pred, Y_train) # calculate value of loss function
+
 				batch_error += self.error_signal(Y_train) # accumulate the error for this batch
 				batch_data.append(row) # save the data of the batch
+				
 				# update weight after each batch
 				if (idx+1) % batch_size == 0 or idx == len(data)-1:
-					batch_error /= batch_size # average of errors
+					if len(data) % batch_size != 0 and idx == len(data)-1:
+						# calculate size of last batch in the dataset
+						n_data = len(data) % batch_size 
+					else:
+						n_data = batch_size
+					# average of errors
+					batch_error[:] = [x / n_data for x in batch_error]
+
 					# update weights
+					# batch_data = np.array(batch_data)
+					# batch_data /= n_data
+					# self.update_weights(batch_error, batch_data[:,:-1])
 					for r in batch_data:
 						self.update_weights(batch_error, r[:-1], learning_rate)
 					# clear storage for nexxt batch
-					batch_error = 0
+					batch_error.clear()
 					batch_data.clear()
-			print('>epoch=%d, lrate=%.3f, error=%.3f' % (epoch, learning_rate, loss))
+			print(f'>epoch={epoch}, lrate={learning_rate:.3f}, error={loss:.3f}')
+
+	def predict(self, input):
+		"""
+		Given test features, make prediction Y_pred
+		"""
+		# pass the data through the network
+		self.forward_propagate(input)
+		# inspect output layer to see the predictions
 
 
 
