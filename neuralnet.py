@@ -3,7 +3,8 @@ import numpy as np
 
 def cost_function(y_pred, y_true):
 	"""
-	Calculate the cost (sum of squared erros) from a data point. Data is a 1D array of expected output (matches shape of model outputs)
+	Calculate the cost (sum of squared erros) from a data point. 
+		Data is a 1D array of expected output (matches shape of model outputs)
 	"""
 	return np.sum(np.square(y_true - y_pred))
 
@@ -101,15 +102,15 @@ class Network:
 			for j in range(self.net[i].n_units):
 				self.net[i].weights[j] += input * error[i][j] * learning_rate
 			
-	def train(self, data, n_epoch, n_class, learning_rate=0.1, batch_size=1):
+	def train(self, data, n_epoch, learning_rate=0.1, batch_size=1):
 		"""
 		Train the network using the data. 
 			data: 2D array of data points, with columns as features and last column as the class
 			n_epoch: number of epochs to train
-			n_class: number of classes for the classification task
 			learning_rate: rate of learning for weight updates
 			batch_size: batch size for the training process
 		"""
+		n_class = self.net[-1].n_units # number of classes for the classification task
 		for epoch in range(n_epoch):
 			loss = 0
 			# temporary storage for each batch
@@ -155,8 +156,29 @@ class Network:
 		# pass the data through the network
 		self.forward_propagate(input)
 		# inspect output layer to see the predictions
+		outputs = self.net[-1].outputs # 1D array of network outputs
+		for i in range(self.net[-1].n_units):
+			# return the index of largest value
+			if outputs[i] == np.max(outputs):
+				return i
 
-
+	def test_model(self, test_data):
+		"""
+		Test the network using test_data
+			test_data: 2D arrays of data points, with last column as the class labels
+		"""
+		correct_count = 0
+		n_data = 0
+		# iterate through all test data
+		for row in test_data:
+			n_data += 1
+			# match prediction with expected result
+			if self.predict(row[:-1]) == row[-1]:
+				correct_count += 1
+		# calculate statistics
+		accuracy = correct_count/n_data
+		print(f"Result: {accuracy*100:.2f}% accuracy, {correct_count}/{n_data} correct")
+		return accuracy
 
 class Layer:
 	def __init__(self, n_inputs, n_units):
