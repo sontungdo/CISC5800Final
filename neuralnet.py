@@ -1,12 +1,12 @@
 import numpy as np
-
+import time
 
 def cost_function(y_pred, y_true):
 	"""
 	Calculate the cost (sum of squared erros) from a data point. 
 		Data is a 1D array of expected output (matches shape of model outputs)
 	"""
-	return np.sum(np.square(y_true - y_pred))
+	return np.sum(np.square(y_pred - y_true))
 
 class Network:
 	def __init__(self):
@@ -112,6 +112,7 @@ class Network:
 		"""
 		n_class = self.net[-1].n_units # number of classes for the classification task
 		for epoch in range(n_epoch):
+			start = time.time()
 			loss = 0
 			# temporary storage for each batch
 			batch_error = list()
@@ -147,7 +148,9 @@ class Network:
 					# clear storage for nexxt batch
 					batch_error.clear()
 					batch_data.clear()
-			print(f'>epoch={epoch}, lrate={learning_rate:.3f}, error={loss:.3f}')
+			end = time.time()
+			print(f'>epoch={epoch+1}/{n_epoch}, loss={loss/len(data):.5f}, time={start-end:.5f}s/epoch')
+		print('Training complete')
 
 	def predict(self, input):
 		"""
