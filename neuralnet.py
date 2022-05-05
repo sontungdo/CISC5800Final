@@ -8,6 +8,18 @@ def cost_function(y_pred, y_true):
 	"""
 	return np.sum(np.square(y_pred - y_true))
 
+def normalize(data):
+	"""
+	Normalize the data along the feature column
+		data: 2D array containing data points
+	"""
+	# iterate through all columns
+	for i in range(data.shape[1]):
+		mean = np.mean(data[:,i])
+		std = np.std(data[:,i])
+		data[:,i] = (data[:,i] - mean) / std
+	return data
+
 class Network:
 	def __init__(self):
 		"""
@@ -140,9 +152,6 @@ class Network:
 					batch_error[:] = [x / n_data for x in batch_error]
 
 					# update weights
-					# batch_data = np.array(batch_data)
-					# batch_data /= n_data
-					# self.update_weights(batch_error, batch_data[:,:-1])
 					for r in batch_data:
 						self.update_weights(batch_error, r[:-1], learning_rate)
 					# clear storage for nexxt batch
@@ -190,8 +199,7 @@ class Layer:
 			n_inputs columns. biases is a 1D array of n_units
 		outputs is the vector containing outputs of all n_units neurons
 		"""
-		self.weights = np.random.rand(n_units, n_inputs+1)
-		#self.biases = np.random.rand(n_units)
+		self.weights = np.random.rand(n_units, n_inputs+1) * 2 - 1 # weights are random between -1 and 1
 		self.outputs = np.zeros(n_units)
 		self.n_units = n_units # number of units
 
@@ -206,7 +214,6 @@ class Layer:
 		for i in range(self.n_units):
 			# calculate dot product of weights and inputs, plus the bias
 			self.outputs[i] = np.dot(self.weights[i], inputs)
-			#self.outputs[i] = np.dot(self.weights[i,:-1], inputs) + self.weights[i,-1]
 	
 	def sigmoid(self):
 		"""
