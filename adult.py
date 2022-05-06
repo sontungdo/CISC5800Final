@@ -1,4 +1,5 @@
 import neuralnet as nn
+from neuralnet import normalize
 import numpy as np
 import pandas as pd
 
@@ -10,6 +11,8 @@ df=[]
 for i in lines:
     df.append(i.split(','))
 df=df[:-1]
+
+# pre-process
 for i in range(len(df)):    
     if (df[i][1] ==' Private'):   ## workclass(1)
         df[i][1]=0
@@ -58,11 +61,11 @@ for i in range(len(df)):
 
 for i in df:   ## delete occupation(6) && relationship(7)
     del i[6:8]  
-    #del i[2]
 
 df = np.array([[int(j) for j in i] for i in df])
 
 # process imbalanced data
+df = normalize(df)
 df = pd.DataFrame(df)
 df_zero = df[df[12] == 0]
 df_one = df[df[12] == 1]
@@ -81,17 +84,15 @@ split = 12000
 df_train = df[:split]
 df_test = df[split:]
 
+
+
 # construct network
 model = nn.Network()
 input_shape = df.shape[1]-1
-model.construct_network(input_shape, [10,2])
+model.construct_network(input_shape, [2,2])
 
 # train the model
-model.adaptive_train(df_train, n_epoch=10, learning_rate=0.1, batch_size=100)
+model.momentum_train(df_train, n_epoch=10, learning_rate=0.05, batch_size=5000)
 
 # test model
 model.test_model(df_test)
-
-# for i in range(20):
-#     model.forward_propagate(df_test[i,:-1])
-#     print(model.predict(df_test[i,:-1]), df_test[i,-1])

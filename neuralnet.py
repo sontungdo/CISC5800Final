@@ -116,7 +116,7 @@ class Network:
 			
 	def train(self, data, n_epoch, learning_rate=0.1, batch_size=1):
 		"""
-		Train the network using the data. 
+		Train the network using the data. Use SGD.
 			data: 2D array of data points, with columns as features and last column as the class
 			n_epoch: number of epochs to train
 			learning_rate: rate of learning for weight updates
@@ -170,8 +170,8 @@ class Network:
 			batch_size: batch size for the training process
 		"""
 		# establish checkpoints where learning rate is decreased
-		checkpoint1 = int(n_epoch/3)
-		checkpoint2 = int(n_epoch * 2/3)
+		checkpoint1 = int(n_epoch/2)
+		checkpoint2 = int(n_epoch * 3/4)
 		n_class = self.net[-1].n_units # number of classes for the classification task
 		for epoch in range(n_epoch):
 			start = time.time()
@@ -214,6 +214,64 @@ class Network:
 			print(f'>epoch={epoch+1}/{n_epoch}, l_rate={learning_rate:.3f}, loss={loss/len(data):.5f}, time={end-start:.5f}s/epoch')
 		print('Training complete')
 
+	def momentum_train(self, data, n_epoch, learning_rate=0.05, batch_size=1):
+		"""
+		Train the network using the data. Incorporate momentum in SGD.
+			data: 2D array of data points, with columns as features and last column as the class
+			n_epoch: number of epochs to train
+			learning_rate: rate of learning for weight updates
+			batch_size: batch size for the training process
+		"""
+		n_class = self.net[-1].n_units # number of classes for the classification task
+		# make a queue to store batch_error history. For each epoch, append the error and pop previous error
+		error_queue = list()
+		for epoch in range(n_epoch):
+			start = time.time()
+			loss = 0
+			# temporary storage for each batch
+			batch_error = list()
+			batch_data = list()
+			for idx, row in enumerate(data):
+				# forward pass
+				self.forward_propagate(row[:-1])
+				Y_pred = self.get_output()
+
+				Y_train = [0 for i in range(n_class)]
+				Y_train[int(row[-1])] = 1
+				loss += cost_function(Y_pred, Y_train) # calculate value of loss function
+
+				batch_error += self.error_signal(Y_train) # accumulate the error for this batch
+				batch_data.append(row) # save the data of the batch
+				
+				# update weight after each batch
+				if (idx+1) % batch_size == 0 or idx == len(data)-1:
+					if len(data) % batch_size != 0 and idx == len(data)-1:
+						# calculate size of last batch in the dataset
+						n_data = len(data) % batch_size 
+					else:
+						n_data = batch_size
+
+					# average of errors
+					batch_error[:] = [x / n_data for x in batch_error]
+					# store error for next iteration
+					error_queue.append(batch_error[:]) # append a copy so that clear() will NOT delete elements from queue
+
+					# update weights
+					for r in batch_data:
+						self.update_weights(batch_error, r[:-1], learning_rate)
+						# update weights using momentum of previous epochs
+						if epoch != 0:
+							self.update_weights(error_queue[0], r[:-1], learning_rate*2)
+					if epoch != 0:
+						error_queue.pop(0)
+
+					# clear storage for nexxt batch
+					batch_error.clear()
+					batch_data.clear()
+			end = time.time()
+			print(f'>epoch={epoch+1}/{n_epoch}, loss={loss/len(data):.5f}, time={end-start:.5f}s/epoch')
+		print('Training complete')
+	
 	def predict(self, input):
 		"""
 		Given test features, make prediction Y_pred
